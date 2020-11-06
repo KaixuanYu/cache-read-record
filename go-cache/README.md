@@ -18,13 +18,16 @@ cache can be saved to and loaded from a file (using `c.Items()` to retrieve the
 items map to serialize, and `NewFrom()` to create a cache from a deserialized
 one) to recover from downtime quickly. (See the docs for `NewFrom()` for caveats.)
 
-### Installation
+尽管不打算将go-cache用作持久数据储存数据库，但是可以将整个缓存保存到文件中，也可以从文件中加载出来。（使用 `c.Items` 来检索
+items map 去 序列化，然后 `NewFrom()` 来创建一个cache从解序列化的那个。）
+
+### Installation 安装
 
 `go get github.com/patrickmn/go-cache`
 
-### Usage
+### Usage 使用
 
-```go
+```
 import (
 	"fmt"
 	"github.com/patrickmn/go-cache"
@@ -34,6 +37,7 @@ import (
 func main() {
 	// Create a cache with a default expiration time of 5 minutes, and which
 	// purges expired items every 10 minutes
+	// 创建一个默认过期时间为5分钟的缓存，该缓存每10分钟清除一次过期的item
 	c := cache.New(5*time.Minute, 10*time.Minute)
 
 	// Set the value of the key "foo" to "bar", with the default expiration time
@@ -55,6 +59,7 @@ func main() {
 	// take arbitrary types, (i.e. interface{}). The simplest way to do this for
 	// values which will only be used once--e.g. for passing to another
 	// function--is:
+	//由于Go是静态类型的，并且缓存值可以是任何值，因此当将值传递给不采用任意类型的函数（即interface {}）时，需要类型断言。 对于仅使用一次的值执行此操作的最简单方法-例如 传递给另一个
 	foo, found := c.Get("foo")
 	if found {
 		MyFunction(foo.(string))
@@ -62,6 +67,7 @@ func main() {
 
 	// This gets tedious if the value is used several times in the same function.
 	// You might do either of the following instead:
+	//如果在同一函数中多次使用该值，则将变得很乏味。 您可以执行以下任一操作：
 	if x, found := c.Get("foo"); found {
 		foo := x.(string)
 		// ...
