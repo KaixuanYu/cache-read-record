@@ -1,5 +1,33 @@
 # go-cache
 
+## 简介
+1. 支持并发。就是个加了读写锁的map。
+2. 支持key过期。map的value中存了过期时间，启动个定时器遍历map过期删除（遍历的时候加了锁，key太多有性能问题）
+3. 支持key过期事件。key过期会调用一个onEvicted函数，onEvicted是业务方自定义的。
+4. 支持持久化。可以通过 Items()函数取出所有的key：value，然后自己做持久化存储。
+5. 支持初始化加载指定的 key：value 的map
+
+### 亮点
+- 这里就是 在 cache 上包了一层 Cache，因为cache被runJanitor的goroutine引用，gc会一直忽略对它的回收。
+- 但是包了一层Cache，当外部的使用方不再用Cache的时候，因为没有额外的引用，gc会回收Cache。
+- SetFinalizer会在回收Cache的时候调用stopJanitor，停掉janitor goroutine，从而cache失去引用，也会被gc
+```
+type Cache struct {
+	*cache
+}
+func newCacheWithJanitor(de time.Duration, ci time.Duration, m map[string]Item) *Cache {
+	c := newCache(de, m)
+	C := &Cache{c}
+	if ci > 0 {
+		runJanitor(c, ci)
+		runtime.SetFinalizer(C, stopJanitor) //此函数的意义：当GC准备释放C时，会调用 stopJanitor 方法。
+	}
+	return C
+}
+```
+
+## 原readme阅读
+
 go-cache is an in-memory key:value store/cache similar to memcached that is
 suitable for applications running on a single machine. Its major advantage is
 that, being essentially a thread-safe `map[string]interface{}` with expiration
