@@ -5,8 +5,13 @@ suitable for applications running on a single machine. Its major advantage is
 that, being essentially a thread-safe `map[string]interface{}` with expiration
 times, it doesn't need to serialize or transmit its contents over the network.
 
+go-cache 是一个基于内存的key：value储存，它类似于memcached，适用于在一台计算机上运行。它的主要优点是：
+它本质上是具有到期时间的线程安全的 `map[string]interface` ，因此不需要序列化或者在网络上传输内容。
+
 Any object can be stored, for a given duration or forever, and the cache can be
 safely used by multiple goroutines.
+
+可以储存任何对象（在给定的持续时间内或者永久储存），并且 缓存可以被多个 goroutines 安全的使用
 
 Although go-cache isn't meant to be used as a persistent datastore, the entire
 cache can be saved to and loaded from a file (using `c.Items()` to retrieve the
