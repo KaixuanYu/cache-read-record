@@ -15,7 +15,7 @@ type Item struct {
 	Expiration int64
 }
 
-// Returns true if the item has expired.
+// Returns true if the item has expired. 过期返回true
 func (item Item) Expired() bool {
 	if item.Expiration == 0 {
 		return false
@@ -35,22 +35,25 @@ const (
 type Cache struct {
 	*cache
 	// If this is confusing, see the comment at the bottom of New()
+	// 如果这让人困惑，请参阅New()底部的注释
 }
 
 type cache struct {
-	defaultExpiration time.Duration
-	items             map[string]Item
-	mu                sync.RWMutex
-	onEvicted         func(string, interface{})
+	defaultExpiration time.Duration             //默认的过期时间
+	items             map[string]Item           // key ： value 对
+	mu                sync.RWMutex              // 锁
+	onEvicted         func(string, interface{}) //逐出  删除后的回调函数呀这是
 	janitor           *janitor
 }
 
 // Add an item to the cache, replacing any existing item. If the duration is 0
 // (DefaultExpiration), the cache's default expiration time is used. If it is -1
 // (NoExpiration), the item never expires.
+// 将item 添加到缓存，替换任何现有item 。
+// 如果参数d为0，那么cache的默认expiration time将被使用。 如果参数d=-1（NoExpiration），item将永远不会过期。
 func (c *cache) Set(k string, x interface{}, d time.Duration) {
 	// "Inlining" of set
-	var e int64
+	var e int64 // 过期时间
 	if d == DefaultExpiration {
 		d = c.defaultExpiration
 	}
@@ -64,9 +67,11 @@ func (c *cache) Set(k string, x interface{}, d time.Duration) {
 	}
 	// TODO: Calls to mu.Unlock are currently not deferred because defer
 	// adds ~200 ns (as of go1.)
+	// 当前不延迟对mu.Unlock的调用，因为defer会增加〜200 ns（从go1开始）。
 	c.mu.Unlock()
 }
 
+// 不安全的 set ，对 map 没加锁
 func (c *cache) set(k string, x interface{}, d time.Duration) {
 	var e int64
 	if d == DefaultExpiration {
@@ -82,13 +87,14 @@ func (c *cache) set(k string, x interface{}, d time.Duration) {
 }
 
 // Add an item to the cache, replacing any existing item, using the default
-// expiration.
+// expiration. 使用默认时间 set 一个key：value对
 func (c *cache) SetDefault(k string, x interface{}) {
 	c.Set(k, x, DefaultExpiration)
 }
 
 // Add an item to the cache only if an item doesn't already exist for the given
 // key, or if the existing item has expired. Returns an error otherwise.
+// Add 新增一个key：value到cache中，如果key已经在cache存在，将会返回错误。
 func (c *cache) Add(k string, x interface{}, d time.Duration) error {
 	c.mu.Lock()
 	_, found := c.get(k)
@@ -96,13 +102,14 @@ func (c *cache) Add(k string, x interface{}, d time.Duration) error {
 		c.mu.Unlock()
 		return fmt.Errorf("Item %s already exists", k)
 	}
-	c.set(k, x, d)
+	c.set(k, x, d) //这个对get和set操作都加锁了，所以不会出现 map panic
 	c.mu.Unlock()
 	return nil
 }
 
 // Set a new value for the cache key only if it already exists, and the existing
 // item hasn't expired. Returns an error otherwise.
+// 更新一个现有的key：value，如果不存在会返回错误，只更新已有并且未过期的。
 func (c *cache) Replace(k string, x interface{}, d time.Duration) error {
 	c.mu.Lock()
 	_, found := c.get(k)
@@ -117,15 +124,16 @@ func (c *cache) Replace(k string, x interface{}, d time.Duration) error {
 
 // Get an item from the cache. Returns the item or nil, and a bool indicating
 // whether the key was found.
+// 从 cache 中获取一个 item。 返回一个item或者nil，还有 一个bool代表key是否找到
 func (c *cache) Get(k string) (interface{}, bool) {
 	c.mu.RLock()
-	// "Inlining" of get and Expired
+	// "Inlining" of get and Expired 对get的内联？是说将get函数重写了一遍没有直接调用，来实现内联了？
 	item, found := c.items[k]
 	if !found {
 		c.mu.RUnlock()
 		return nil, false
 	}
-	if item.Expiration > 0 {
+	if item.Expiration > 0 { //get的时候如果发现过期，会直接返回nil，false
 		if time.Now().UnixNano() > item.Expiration {
 			c.mu.RUnlock()
 			return nil, false
@@ -139,6 +147,8 @@ func (c *cache) Get(k string) (interface{}, bool) {
 // It returns the item or nil, the expiration time if one is set (if the item
 // never expires a zero value for time.Time is returned), and a bool indicating
 // whether the key was found.
+// GetWithExpiration 返回一个item和它的过期时间
+// 它返回 item 或者nil，过期时间（如果永不过期，就返回0值），和一个bool代表key是否被找到。
 func (c *cache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
 	c.mu.RLock()
 	// "Inlining" of get and Expired
@@ -165,12 +175,13 @@ func (c *cache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
 	return item.Object, time.Time{}, true
 }
 
+// 没加锁的get，用的话，需要自己加锁
 func (c *cache) get(k string) (interface{}, bool) {
 	item, found := c.items[k]
 	if !found {
 		return nil, false
 	}
-	// "Inlining" of Expired
+	// "Inlining" of Expired 直接将Expired函数复制到这里了，这就是内联！！！
 	if item.Expiration > 0 {
 		if time.Now().UnixNano() > item.Expiration {
 			return nil, false
@@ -902,12 +913,13 @@ func (c *cache) DecrementFloat64(k string, n float64) (float64, error) {
 }
 
 // Delete an item from the cache. Does nothing if the key is not in the cache.
+// Delete 从cache中删除一个item。 如果key不存在，就啥都不做
 func (c *cache) Delete(k string) {
 	c.mu.Lock()
 	v, evicted := c.delete(k)
 	c.mu.Unlock()
 	if evicted {
-		c.onEvicted(k, v)
+		c.onEvicted(k, v) //如果onEvicted不是nil，就在删除后调用onEvicted
 	}
 }
 
@@ -928,6 +940,7 @@ type keyAndValue struct {
 }
 
 // Delete all expired items from the cache.
+// 从cache中删除所有过期的items，然后调用删除回调函数。
 func (c *cache) DeleteExpired() {
 	var evictedItems []keyAndValue
 	now := time.Now().UnixNano()
@@ -950,6 +963,7 @@ func (c *cache) DeleteExpired() {
 // Sets an (optional) function that is called with the key and value when an
 // item is evicted from the cache. (Including when it is deleted manually, but
 // not when it is overwritten.) Set to nil to disable.
+//设置从缓存中逐出项目时使用键和值调用的（可选）函数。（包括手动删除的时间，但不包括被覆盖的时间。）设置为nil禁用。
 func (c *cache) OnEvicted(f func(string, interface{})) {
 	c.mu.Lock()
 	c.onEvicted = f
@@ -957,9 +971,11 @@ func (c *cache) OnEvicted(f func(string, interface{})) {
 }
 
 // Write the cache's items (using Gob) to an io.Writer.
-//
+// 将 cache 的 items 写入到 io.Writer
+
 // NOTE: This method is deprecated in favor of c.Items() and NewFrom() (see the
 // documentation for NewFrom().)
+// 注意：不推荐使用此方法，而推荐使用c.Items（）和NewFrom（）（请参阅有关NewFrom（）的文档。）
 func (c *cache) Save(w io.Writer) (err error) {
 	enc := gob.NewEncoder(w)
 	defer func() {
@@ -978,7 +994,7 @@ func (c *cache) Save(w io.Writer) (err error) {
 
 // Save the cache's items to the given filename, creating the file if it
 // doesn't exist, and overwriting it if it does.
-//
+// 将 cache 的 items 保存到 给定的 filename 文件中。
 // NOTE: This method is deprecated in favor of c.Items() and NewFrom() (see the
 // documentation for NewFrom().)
 func (c *cache) SaveFile(fname string) error {
@@ -996,7 +1012,7 @@ func (c *cache) SaveFile(fname string) error {
 
 // Add (Gob-serialized) cache items from an io.Reader, excluding any items with
 // keys that already exist (and haven't expired) in the current cache.
-//
+// 从io.Reader添加（Gob序列化的）缓存项，但不包括当前缓存中已存在（但尚未过期）键的所有项。
 // NOTE: This method is deprecated in favor of c.Items() and NewFrom() (see the
 // documentation for NewFrom().)
 func (c *cache) Load(r io.Reader) error {
@@ -1035,6 +1051,7 @@ func (c *cache) LoadFile(fname string) error {
 }
 
 // Copies all unexpired items in the cache into a new map and returns it.
+// 将缓存中所有未过期的项目复制到新映射中并返回。
 func (c *cache) Items() map[string]Item {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -1054,6 +1071,7 @@ func (c *cache) Items() map[string]Item {
 
 // Returns the number of items in the cache. This may include items that have
 // expired, but have not yet been cleaned up.
+// 返回缓存中的项目数。 这可能包括已过期但尚未清理的项目。
 func (c *cache) ItemCount() int {
 	c.mu.RLock()
 	n := len(c.items)
@@ -1062,6 +1080,7 @@ func (c *cache) ItemCount() int {
 }
 
 // Delete all items from the cache.
+// 从缓存中删除所有项目。
 func (c *cache) Flush() {
 	c.mu.Lock()
 	c.items = map[string]Item{}
@@ -1117,10 +1136,16 @@ func newCacheWithJanitor(de time.Duration, ci time.Duration, m map[string]Item) 
 	// the returned C object from being garbage collected. When it is
 	// garbage collected, the finalizer stops the janitor goroutine, after
 	// which c can be collected.
+	// 这个技巧确保了janitor goroutine不会阻止返回的C对象被垃圾回收。，
+	// 垃圾回收时， finalizer 停止 janitor goroutine 之后，c将被回收
+
+	// 这里就是 在 c 上包了一层 C，因为c被runJanitor的goroutine引用，gc会一直忽略对它的回收。
+	// 但是包了一层C，当外部的使用方不再用C的时候，因为没有额外的引用，gc会回收C，
+	// SetFinalizer会在回收C的时候调用stopJanitor，停掉janitor goroutine，从而c失去引用，也会被gc
 	C := &Cache{c}
 	if ci > 0 {
 		runJanitor(c, ci)
-		runtime.SetFinalizer(C, stopJanitor)
+		runtime.SetFinalizer(C, stopJanitor) //此函数的意义：当GC准备释放C时，会调用 stopJanitor 方法。
 	}
 	return C
 }
@@ -1130,6 +1155,9 @@ func newCacheWithJanitor(de time.Duration, ci time.Duration, m map[string]Item) 
 // the items in the cache never expire (by default), and must be deleted
 // manually. If the cleanup interval is less than one, expired items are not
 // deleted from the cache before calling c.DeleteExpired().
+// 返回一个cache，该cache有默认的过期时间和清理间隔
+// 如果过期时间比1小（获取没有过期时间），那么items 将永不过期（默认情况下），并且必须手动删除。
+// 如果清理间隔小于1，在调用c.DeleteExpired()之前，过期的items不会被删除。
 func New(defaultExpiration, cleanupInterval time.Duration) *Cache {
 	items := make(map[string]Item)
 	return newCacheWithJanitor(defaultExpiration, cleanupInterval, items)
