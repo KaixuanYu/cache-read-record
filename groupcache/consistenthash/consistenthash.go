@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 // Package consistenthash provides an implementation of a ring hash.
+// 软件包consistenthash提供了环形哈希的实现。
 package consistenthash
 
 import (
