@@ -33,9 +33,10 @@ import (
 
 const defaultBasePath = "/_groupcache/"
 
-const defaultReplicas = 50
+const defaultReplicas = 50 // 默认的副本数量
 
 // HTTPPool implements PeerPicker for a pool of HTTP peers.
+// HTTPool 实现了 PeerPicker . 是一个Http peers 的 pool
 type HTTPPool struct {
 	// Context optionally specifies a context for the server to use when it
 	// receives a request.

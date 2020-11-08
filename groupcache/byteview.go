@@ -29,13 +29,19 @@ import (
 //
 // A ByteView is meant to be used as a value type, not
 // a pointer (like a time.Time).
+// ByteView拥有字节的不变视图。
+// 在内部它包装了[] byte或字符串，但是该细节对于调用者是不可见的。
+//
+// ByteView应该用作值类型，而不是指针（如time.Time）。
 type ByteView struct {
 	// If b is non-nil, b is used, else s is used.
+	// 如果 b == nil， s被使用，否则 b 被使用
 	b []byte
 	s string
 }
 
 // Len returns the view's length.
+// Len 返回 view 的长度
 func (v ByteView) Len() int {
 	if v.b != nil {
 		return len(v.b)
@@ -44,6 +50,7 @@ func (v ByteView) Len() int {
 }
 
 // ByteSlice returns a copy of the data as a byte slice.
+// 将ByteView转化成 []byte
 func (v ByteView) ByteSlice() []byte {
 	if v.b != nil {
 		return cloneBytes(v.b)
@@ -52,6 +59,7 @@ func (v ByteView) ByteSlice() []byte {
 }
 
 // String returns the data as a string, making a copy if necessary.
+// 将 ByteView 转化成 []byte
 func (v ByteView) String() string {
 	if v.b != nil {
 		return string(v.b)
@@ -60,6 +68,7 @@ func (v ByteView) String() string {
 }
 
 // At returns the byte at index i.
+// 返回 i 索引处的 byte
 func (v ByteView) At(i int) byte {
 	if v.b != nil {
 		return v.b[i]
@@ -68,6 +77,7 @@ func (v ByteView) At(i int) byte {
 }
 
 // Slice slices the view between the provided from and to indices.
+// 切片在提供的from和to索引之间切片视图。
 func (v ByteView) Slice(from, to int) ByteView {
 	if v.b != nil {
 		return ByteView{b: v.b[from:to]}
@@ -76,6 +86,7 @@ func (v ByteView) Slice(from, to int) ByteView {
 }
 
 // SliceFrom slices the view from the provided index until the end.
+// SliceFrom从提供的索引中切片视图，直至结束。
 func (v ByteView) SliceFrom(from int) ByteView {
 	if v.b != nil {
 		return ByteView{b: v.b[from:]}
@@ -84,6 +95,7 @@ func (v ByteView) SliceFrom(from int) ByteView {
 }
 
 // Copy copies b into dest and returns the number of bytes copied.
+// 将b复制到dest中，并返回复制的字节数。
 func (v ByteView) Copy(dest []byte) int {
 	if v.b != nil {
 		return copy(dest, v.b)
@@ -92,7 +104,7 @@ func (v ByteView) Copy(dest []byte) int {
 }
 
 // Equal returns whether the bytes in b are the same as the bytes in
-// b2.
+// b2. 判断两个 ByteView 是否相等
 func (v ByteView) Equal(b2 ByteView) bool {
 	if b2.b == nil {
 		return v.EqualString(b2.s)
@@ -102,6 +114,7 @@ func (v ByteView) Equal(b2 ByteView) bool {
 
 // EqualString returns whether the bytes in b are the same as the bytes
 // in s.
+//string是否与ByteView相等
 func (v ByteView) EqualString(s string) bool {
 	if v.b == nil {
 		return v.s == s
@@ -120,6 +133,7 @@ func (v ByteView) EqualString(s string) bool {
 
 // EqualBytes returns whether the bytes in b are the same as the bytes
 // in b2.
+// []byte是否与ByteView相等
 func (v ByteView) EqualBytes(b2 []byte) bool {
 	if v.b != nil {
 		return bytes.Equal(v.b, b2)

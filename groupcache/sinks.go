@@ -23,9 +23,10 @@ import (
 )
 
 // A Sink receives data from a Get call.
-//
+// Sink 从 Get call 接收数据
 // Implementation of Getter must call exactly one of the Set methods
 // on success.
+// Getter的实现必须在成功时恰好调用Set方法之一。
 type Sink interface {
 	// SetString sets the value to s.
 	SetString(s string) error
