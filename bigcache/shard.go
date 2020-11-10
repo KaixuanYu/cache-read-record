@@ -16,8 +16,8 @@ type Metadata struct {
 }
 
 type cacheShard struct {
-	hashmap     map[uint64]uint32
-	entries     queue.BytesQueue
+	hashmap     map[uint64]uint32 //key的hash值和value的偏移的一个映射关系
+	entries     queue.BytesQueue  // value都存在这
 	lock        sync.RWMutex
 	entryBuffer []byte
 	onRemove    onRemoveCallback

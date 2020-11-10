@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	// Number of bytes to encode 0 in uvarint format
+	// Number of bytes to encode 0 in uvarint format 以uvarint格式编码为0的字节数
 	minimumHeaderSize = 17 // 1 byte blobsize + timestampSizeInBytes + hashSizeInBytes
 	// Bytes before left margin are not used. Zero index means element does not exist in queue, useful while reading slice from index
 	leftMarginIndex = 1
@@ -21,17 +21,19 @@ var (
 
 // BytesQueue is a non-thread safe queue type of fifo based on bytes array.
 // For every push operation index of entry is returned. It can be used to read the entry later
+// BytesQueue是基于字节数组的fifo的非线程安全队列类型。
+//对于每个推入操作，返回条目的索引。 以后可以用来阅读条目
 type BytesQueue struct {
-	full         bool
-	array        []byte
-	capacity     int
-	maxCapacity  int
-	head         int
-	tail         int
-	count        int
-	rightMargin  int
+	full         bool   // 是否满了
+	array        []byte // 字节数组
+	capacity     int    // 目前容量（单位byte）
+	maxCapacity  int    // 最大容量
+	head         int    // 头指针
+	tail         int    // 尾指针
+	count        int    // 应该是条目数量
+	rightMargin  int    // 有边界
 	headerBuffer []byte
-	verbose      bool
+	verbose      bool //是否开启日志？
 }
 
 type queueError struct {
@@ -53,15 +55,15 @@ func getUvarintSize(x uint32) int {
 	}
 }
 
-// NewBytesQueue initialize new bytes queue.
-// capacity is used in bytes array allocation
-// When verbose flag is set then information about memory allocation are printed
+// NewBytesQueue initialize new bytes queue. 初始化一个新的字节队列。
+// capacity is used in bytes array allocation 参数capacity用来分配内存
+// When verbose flag is set then information about memory allocation are printed verbose设置后，内存分配会被输出
 func NewBytesQueue(capacity int, maxCapacity int, verbose bool) *BytesQueue {
 	return &BytesQueue{
 		array:        make([]byte, capacity),
 		capacity:     capacity,
 		maxCapacity:  maxCapacity,
-		headerBuffer: make([]byte, binary.MaxVarintLen32),
+		headerBuffer: make([]byte, binary.MaxVarintLen32), //5字节长度？
 		tail:         leftMarginIndex,
 		head:         leftMarginIndex,
 		rightMargin:  leftMarginIndex,
@@ -69,7 +71,7 @@ func NewBytesQueue(capacity int, maxCapacity int, verbose bool) *BytesQueue {
 	}
 }
 
-// Reset removes all entries from queue
+// Reset removes all entries from queue 重置
 func (q *BytesQueue) Reset() {
 	// Just reset indexes
 	q.tail = leftMarginIndex
@@ -81,6 +83,8 @@ func (q *BytesQueue) Reset() {
 
 // Push copies entry at the end of queue and moves tail pointer. Allocates more space if needed.
 // Returns index for pushed data or error if maximum size queue limit is reached.
+// Push 拷贝entry到queue的尾部，然后移动tail指针。如果需要，会分配更多空间。
+// 返回存入之后的数据的index，或者如果超出限制就返回error
 func (q *BytesQueue) Push(data []byte) (int, error) {
 	dataLen := len(data)
 	headerEntrySize := getUvarintSize(uint32(dataLen))

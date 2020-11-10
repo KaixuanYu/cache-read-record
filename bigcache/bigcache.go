@@ -157,6 +157,7 @@ func (c *BigCache) Delete(key string) error {
 }
 
 // Reset empties all cache shards
+// Reset 清空所有的 缓存分片
 func (c *BigCache) Reset() error {
 	for _, shard := range c.shards {
 		shard.reset(c.config)
@@ -165,6 +166,7 @@ func (c *BigCache) Reset() error {
 }
 
 // Len computes number of entries in cache
+// Len 返回所有分片中的entries的总和
 func (c *BigCache) Len() int {
 	var len int
 	for _, shard := range c.shards {
@@ -174,6 +176,7 @@ func (c *BigCache) Len() int {
 }
 
 // Capacity returns amount of bytes store in the cache.
+// Capacity 返回缓存中存储的字节数。
 func (c *BigCache) Capacity() int {
 	var len int
 	for _, shard := range c.shards {
@@ -182,7 +185,7 @@ func (c *BigCache) Capacity() int {
 	return len
 }
 
-// Stats returns cache's statistics
+// Stats returns cache's statistics 返回cache统计信息
 func (c *BigCache) Stats() Stats {
 	var s Stats
 	for _, shard := range c.shards {
@@ -197,6 +200,7 @@ func (c *BigCache) Stats() Stats {
 }
 
 // KeyMetadata returns number of times a cached resource was requested.
+//KeyMetadata返回请求缓存资源的次数。
 func (c *BigCache) KeyMetadata(key string) Metadata {
 	hashedKey := c.hash.Sum64(key)
 	shard := c.getShard(hashedKey)
@@ -204,6 +208,7 @@ func (c *BigCache) KeyMetadata(key string) Metadata {
 }
 
 // Iterator returns iterator function to iterate over EntryInfo's from whole cache.
+//迭代器返回迭代器函数以迭代整个缓存中的EntryInfo。
 func (c *BigCache) Iterator() *EntryInfoIterator {
 	return newIterator(c)
 }
