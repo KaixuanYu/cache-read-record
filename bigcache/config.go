@@ -5,11 +5,17 @@ import "time"
 // Config for BigCache
 type Config struct {
 	// Number of cache shards, value must be a power of two
+	// 分片的数量，必须是2次幂
 	Shards int
 	// Time after which entry can be evicted
+	// key的统一过期时间。bigcache不支持设置每个key的单独过期时间，一个bigcache实例的所有key的过期时间都是一样的。
 	LifeWindow time.Duration
 	// Interval between removing expired entries (clean up).
 	// If set to <= 0 then no action is performed. Setting to < 1 second is counterproductive — bigcache has a one second resolution.
+	// 清除过期entries 的时间间隔（clean up）。
+	// 如果该值小于0，那么就不会再new bigcache的时候启动一个协程去定时的执行cleanUp了。
+	// 不要设置成小于1秒的。bigcache的最小单位是一秒
+	// 调用cleanUp的时间间隔，就是清除key的时间间隔，每几秒清除一次key。
 	CleanWindow time.Duration
 	// Max number of entries in life window. Used only to calculate initial size for cache shards.
 	// When proper value is set then additional memory allocation does not occur.

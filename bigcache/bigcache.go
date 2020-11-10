@@ -24,31 +24,37 @@ type BigCache struct {
 }
 
 // Response will contain metadata about the entry for which GetWithInfo(key) was called
+// 响应将包含有关调用了GetWithInfo（key）的条目的元数据
 type Response struct {
 	EntryStatus RemoveReason
 }
 
 // RemoveReason is a value used to signal to the user why a particular key was removed in the OnRemove callback.
+// 用来标识为啥指定的key在OnRemove回调中删除
 type RemoveReason uint32
 
 const (
 	// Expired means the key is past its LifeWindow.
+	// 过期
 	Expired = RemoveReason(1)
 	// NoSpace means the key is the oldest and the cache size was at its maximum when Set was called, or the
 	// entry exceeded the maximum shard size.
+	// 空间不足，意味着key是最老的那个，并且cache size 已经达到我们设置的上限了，或者条目超出了shard的最大上限
 	NoSpace = RemoveReason(2)
 	// Deleted means Delete was called and this key was removed as a result.
+	// Deleted 意味着 Delete 被调用
 	Deleted = RemoveReason(3)
 )
 
 // NewBigCache initialize new instance of BigCache
+// NewBigCache 初始化新的 bigCache 实例
 func NewBigCache(config Config) (*BigCache, error) {
 	return newBigCache(config, &systemClock{})
 }
 
 func newBigCache(config Config, clock clock) (*BigCache, error) {
 
-	if !isPowerOfTwo(config.Shards) {
+	if !isPowerOfTwo(config.Shards) { //检查是否是2次幂
 		return nil, fmt.Errorf("Shards number must be power of two")
 	}
 
@@ -78,6 +84,7 @@ func newBigCache(config Config, clock clock) (*BigCache, error) {
 		onRemove = cache.notProvidedOnRemove
 	}
 
+	//初始化各个shards
 	for i := 0; i < config.Shards; i++ {
 		cache.shards[i] = initNewShard(config, onRemove, clock)
 	}

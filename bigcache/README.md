@@ -4,11 +4,14 @@ Fast, concurrent, evicting in-memory cache written to keep big number of entries
 BigCache keeps entries on heap but omits GC for them. To achieve that, operations on byte slices take place,
 therefore entries (de)serialization in front of the cache will be needed in most use cases.
 
-Requires Go 1.12 or newer.
+快速，支持并发，支持内存驱逐，写入大量entries而不会影响性能。
+BigCache将条目储存在堆上，但省略了他们的GC。为此，需要在byte slice上开辟内存操作，因此在缓存的时候进行条目序列化。
 
-## Usage
+Requires Go 1.12 or newer. 需要 Go 1.12 或者更高版本
 
-### Simple initialization
+## Usage 使用
+
+### Simple initialization 简单的初始化
 
 ```go
 import "github.com/allegro/bigcache"
@@ -21,7 +24,7 @@ entry, _ := cache.Get("my-unique-key")
 fmt.Println(string(entry))
 ```
 
-### Custom initialization
+### Custom initialization 自定义初始化
 
 When cache load can be predicted in advance then it is better to use custom initialization because additional memory
 allocation can be avoided in that way.
