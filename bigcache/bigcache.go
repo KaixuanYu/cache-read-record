@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	minimumEntriesInShard = 10 // Minimum number of entries in single shard
+	minimumEntriesInShard = 10 // Minimum number of entries in single shard 在单个 shard 中entries最小的数量
 )
 
 // BigCache is fast, concurrent, evicting cache created to keep big number of entries without impact on performance.
@@ -89,6 +89,7 @@ func newBigCache(config Config, clock clock) (*BigCache, error) {
 		cache.shards[i] = initNewShard(config, onRemove, clock)
 	}
 
+	//定时cleanUp
 	if config.CleanWindow > 0 {
 		go func() {
 			ticker := time.NewTicker(config.CleanWindow)
@@ -110,6 +111,8 @@ func newBigCache(config Config, clock clock) (*BigCache, error) {
 // Close is used to signal a shutdown of the cache when you are done with it.
 // This allows the cleaning goroutines to exit and ensures references are not
 // kept to the cache preventing GC of the entire cache.
+// Close 用于在完成缓存后发出关闭信号。
+// 这允许清理goroutines退出，并确保不会因保留对缓存的引用而阻止整个缓存的GC
 func (c *BigCache) Close() error {
 	close(c.close)
 	return nil
@@ -118,6 +121,7 @@ func (c *BigCache) Close() error {
 // Get reads entry for the key.
 // It returns an ErrEntryNotFound when
 // no entry exists for the given key.
+// Get函数读取key为key的entry。如果不存在就返回 ErrEntryNotFound
 func (c *BigCache) Get(key string) ([]byte, error) {
 	hashedKey := c.hash.Sum64(key)
 	shard := c.getShard(hashedKey)
@@ -127,6 +131,7 @@ func (c *BigCache) Get(key string) ([]byte, error) {
 // GetWithInfo reads entry for the key with Response info.
 // It returns an ErrEntryNotFound when
 // no entry exists for the given key.
+// Response info 里面只有删除的类型，这是会返回软删除的key吗？
 func (c *BigCache) GetWithInfo(key string) ([]byte, Response, error) {
 	hashedKey := c.hash.Sum64(key)
 	shard := c.getShard(hashedKey)
@@ -134,6 +139,7 @@ func (c *BigCache) GetWithInfo(key string) ([]byte, Response, error) {
 }
 
 // Set saves entry under the key
+// Set 储存一个entry
 func (c *BigCache) Set(key string, entry []byte) error {
 	hashedKey := c.hash.Sum64(key)
 	shard := c.getShard(hashedKey)
@@ -143,6 +149,8 @@ func (c *BigCache) Set(key string, entry []byte) error {
 // Append appends entry under the key if key exists, otherwise
 // it will set the key (same behaviour as Set()). With Append() you can
 // concatenate multiple entries under the same key in an lock optimized way.
+// 如果 key 存在，Append 会在指定key下追加一个entry，否则就set一个key（就成了Set()）。
+// 使用Append（）可以以锁优化的方式连接同一个键下的多个条目。
 func (c *BigCache) Append(key string, entry []byte) error {
 	hashedKey := c.hash.Sum64(key)
 	shard := c.getShard(hashedKey)
