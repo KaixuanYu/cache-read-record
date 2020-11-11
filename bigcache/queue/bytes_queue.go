@@ -32,8 +32,8 @@ type BytesQueue struct {
 	tail         int    // 尾指针
 	count        int    // 应该是条目数量
 	rightMargin  int    // 有边界
-	headerBuffer []byte
-	verbose      bool //是否开启日志？
+	headerBuffer []byte // 这个会临时存要存入queue的data的长度，而且这个长度还是用varint编码的
+	verbose      bool   //是否开启日志？
 }
 
 type queueError struct {
@@ -41,6 +41,7 @@ type queueError struct {
 }
 
 // getUvarintSize returns the number of bytes to encode x in uvarint format
+// varint 是一个对整数的编码方式。proto buf 有用到这个东西
 func getUvarintSize(x uint32) int {
 	if x < 128 {
 		return 1
@@ -87,14 +88,17 @@ func (q *BytesQueue) Reset() {
 // 返回存入之后的数据的index，或者如果超出限制就返回error
 func (q *BytesQueue) Push(data []byte) (int, error) {
 	dataLen := len(data)
-	headerEntrySize := getUvarintSize(uint32(dataLen))
+	headerEntrySize := getUvarintSize(uint32(dataLen)) //对数据的长度进行了varint编码
 
 	if !q.canInsertAfterTail(dataLen + headerEntrySize) {
 		if q.canInsertBeforeHead(dataLen + headerEntrySize) {
+			//这个if就是判断的leftMarginIndex -> head 的空间够不够。因为当head>tail的时候，canInsertAfterTail判断了
 			q.tail = leftMarginIndex
 		} else if q.capacity+headerEntrySize+dataLen >= q.maxCapacity && q.maxCapacity > 0 {
+			//如果装的最大数据已经超过 maxCapacity 就直接返回full queue
 			return -1, &queueError{"Full queue. Maximum size limit reached."}
 		} else {
+			//否则就扩充内存
 			q.allocateAdditionalMemory(dataLen + headerEntrySize)
 		}
 	}
@@ -142,21 +146,24 @@ func (q *BytesQueue) allocateAdditionalMemory(minimum int) {
 }
 
 func (q *BytesQueue) push(data []byte, len int) {
+	//将数据长度的varint编码放进 q.headerBuffer 中。并获取到 q.headerBuffer 的长度
 	headerEntrySize := binary.PutUvarint(q.headerBuffer, uint64(len))
+	//将header放进queue中
 	q.copy(q.headerBuffer, headerEntrySize)
-
+	//将data放进queue中
 	q.copy(data, len)
 
 	if q.tail > q.head {
 		q.rightMargin = q.tail
 	}
-	if q.tail == q.head {
+	if q.tail == q.head { //队列头和队列尾重合，队列满了。
 		q.full = true
 	}
 
-	q.count++
+	q.count++ //放进一个元素，count+1
 }
 
+//将数据放入 BytesQueue.array 中，并移动tail到队尾
 func (q *BytesQueue) copy(data []byte, len int) {
 	q.tail += copy(q.array[q.tail:], data[:len])
 }
@@ -246,26 +253,33 @@ func (q *BytesQueue) peek(index int) ([]byte, int, error) {
 }
 
 // canInsertAfterTail returns true if it's possible to insert an entry of size of need after the tail of the queue
+// 判断是否可以在尾后插入。
 func (q *BytesQueue) canInsertAfterTail(need int) bool {
-	if q.full {
+	if q.full { //队列满，肯定不可以
 		return false
 	}
-	if q.tail >= q.head {
+	if q.tail >= q.head { //如果目前是 队列头（0）-> head(3) -> tail(104) -> capacity(512) ，那么就看 512-104是不是够用
 		return q.capacity-q.tail >= need
 	}
 	// 1. there is exactly need bytes between head and tail, so we do not need
 	// to reserve extra space for a potential empty entry when realloc this queue
+	// 1.头和尾之间确实需要字节，因此在重新分配此队列时，我们不需要为潜在的空条目保留额外的空间
 	// 2. still have unused space between tail and head, then we must reserve
 	// at least headerEntrySize bytes so we can put an empty entry
+	// 2.头和尾之间仍然有未使用的空间，那么我们必须至少保留headerEntrySize字节，以便我们可以放置一个空条目
+	// 现在是队列头（0）-> tail(3) -> head(104) -> capacity(512)，tail-head是空区域，就判断104-3是不是大于我想要的空间
+	// todo 为啥要留一个空条目呢？
 	return q.head-q.tail == need || q.head-q.tail >= need+minimumHeaderSize
 }
 
 // canInsertBeforeHead returns true if it's possible to insert an entry of size of need before the head of the queue
+// 是否可以插入到队头之前？
 func (q *BytesQueue) canInsertBeforeHead(need int) bool {
-	if q.full {
+	if q.full { //队列满了不可以
 		return false
 	}
-	if q.tail >= q.head {
+	if q.tail >= q.head { // 如果目前是 队列头（0）-> leftMarginIndex(10) -> head(30) -> tail(104) -> capacity(512)
+		// 那么看 30-10是否>need+minimumHeaderSize
 		return q.head-leftMarginIndex == need || q.head-leftMarginIndex >= need+minimumHeaderSize
 	}
 	return q.head-q.tail == need || q.head-q.tail >= need+minimumHeaderSize
