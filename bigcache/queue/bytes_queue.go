@@ -24,13 +24,19 @@ var (
 // BytesQueue是基于字节数组的fifo的非线程安全队列类型。
 //对于每个推入操作，返回条目的索引。 以后可以用来阅读条目
 type BytesQueue struct {
-	full         bool   // 是否满了
-	array        []byte // 字节数组
-	capacity     int    // 目前容量（单位byte）
-	maxCapacity  int    // 最大容量
-	head         int    // 头指针
-	tail         int    // 尾指针
-	count        int    // 应该是条目数量
+	full        bool   // 是否满了
+	array       []byte // 字节数组
+	capacity    int    // 目前容量（单位byte）
+	maxCapacity int    // 最大容量
+	head        int    // 头指针
+	tail        int    // 尾指针
+	count       int    // 应该是条目数量
+	//rightMargin代表的是有数据的右边界
+	// 1. 如果正常状态tail>head: leftMargin(1) -> head(30) -> tail,rightMargin(90) -> capacity(100)
+	// rightMargin == tail
+	// 2. 如果head > tail: leftMargin(1) -> tail(20) -> head(30) -> rightMargin(90) -> capacity(100)
+	// 这是在1的基础上再push一个20的数据，因为capacity-tail=10<20，所以tail之后不能插入，但是head-leftMargin=29>20所以可以插入到head前。
+	// 所以直接空着tail-capacity的10空间，直接在leftMargin往后开辟空间。
 	rightMargin  int    // 有边界
 	headerBuffer []byte // 这个会临时存要存入queue的data的长度，而且这个长度还是用varint编码的
 	verbose      bool   //是否开启日志？
@@ -113,24 +119,26 @@ func (q *BytesQueue) Push(data []byte) (int, error) {
 func (q *BytesQueue) allocateAdditionalMemory(minimum int) {
 	start := time.Now()
 	if q.capacity < minimum {
-		q.capacity += minimum
+		q.capacity += minimum //如果capacity本身比需求的内存少，就先加上需求的内存的容量（这样可以避免扩容后仍然不满足要求）
 	}
-	q.capacity = q.capacity * 2
+	q.capacity = q.capacity * 2 //2倍扩容
 	if q.capacity > q.maxCapacity && q.maxCapacity > 0 {
-		q.capacity = q.maxCapacity
+		q.capacity = q.maxCapacity //超过限制只给最大限制的容量
 	}
 
 	oldArray := q.array
-	q.array = make([]byte, q.capacity)
+	q.array = make([]byte, q.capacity) //重新开辟空间
 
-	if leftMarginIndex != q.rightMargin {
+	if leftMarginIndex != q.rightMargin { //这代表queue不空
 		copy(q.array, oldArray[:q.rightMargin])
 
 		if q.tail <= q.head {
-			if q.tail != q.head {
+			if q.tail != q.head { //不满也不空
 				headerEntrySize := getUvarintSize(uint32(q.head - q.tail))
 				emptyBlobLen := q.head - q.tail - headerEntrySize
-				q.push(make([]byte, emptyBlobLen), emptyBlobLen)
+				//todo 这里push的count++后是不是就多加了1了？而且临界值好像不准啊。
+				//如果长度正好是128，那么在这么计算之后，填充的是127？
+				q.push(make([]byte, emptyBlobLen), emptyBlobLen) //清空中间空出来那块tail->head
 			}
 
 			q.head = leftMarginIndex
@@ -169,6 +177,7 @@ func (q *BytesQueue) copy(data []byte, len int) {
 }
 
 // Pop reads the oldest entry from queue and moves head pointer to the next one
+// Pop 读取最旧的entry，并且将head指针移动到下一个位置。
 func (q *BytesQueue) Pop() ([]byte, error) {
 	data, headerEntrySize, err := q.peek(q.head)
 	if err != nil {
@@ -193,18 +202,20 @@ func (q *BytesQueue) Pop() ([]byte, error) {
 }
 
 // Peek reads the oldest entry from list without moving head pointer
+// Peek读取最老的entry但是不移动head pointer
 func (q *BytesQueue) Peek() ([]byte, error) {
 	data, _, err := q.peek(q.head)
 	return data, err
 }
 
-// Get reads entry from index
+// Get reads entry from index 从index读取一个entry
 func (q *BytesQueue) Get(index int) ([]byte, error) {
 	data, _, err := q.peek(index)
 	return data, err
 }
 
 // CheckGet checks if an entry can be read from index
+// 检查是否可以从某个index读取到数据
 func (q *BytesQueue) CheckGet(index int) error {
 	return q.peekCheckErr(index)
 }
@@ -225,6 +236,7 @@ func (e *queueError) Error() string {
 }
 
 // peekCheckErr is identical to peek, but does not actually return any data
+//peekCheckErr与peek相同，但实际上不返回任何数据
 func (q *BytesQueue) peekCheckErr(index int) error {
 
 	if q.count == 0 {
@@ -278,7 +290,7 @@ func (q *BytesQueue) canInsertBeforeHead(need int) bool {
 	if q.full { //队列满了不可以
 		return false
 	}
-	if q.tail >= q.head { // 如果目前是 队列头（0）-> leftMarginIndex(10) -> head(30) -> tail(104) -> capacity(512)
+	if q.tail >= q.head { // 如果目前是 队列头（0）-> leftMarginIndex(1) -> head(30) -> tail(104) -> capacity(512)
 		// 那么看 30-10是否>need+minimumHeaderSize
 		return q.head-leftMarginIndex == need || q.head-leftMarginIndex >= need+minimumHeaderSize
 	}
