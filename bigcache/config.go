@@ -21,6 +21,7 @@ type Config struct {
 	// When proper value is set then additional memory allocation does not occur.
 	MaxEntriesInWindow int
 	// Max size of entry in bytes. Used only to calculate initial size for cache shards.
+	// 最大的entry的字节数。 只用来计算cache分片的初始size
 	MaxEntrySize int
 	// StatsEnabled if true calculate the number of times a cached resource was requested.
 	StatsEnabled bool
@@ -73,11 +74,13 @@ func DefaultConfig(eviction time.Duration) Config {
 }
 
 // initialShardSize computes initial shard size
+// 计算初始的shard size
 func (c Config) initialShardSize() int {
 	return max(c.MaxEntriesInWindow/c.Shards, minimumEntriesInShard)
 }
 
 // maximumShardSizeInBytes computes maximum shard size in bytes
+// 计算shard最大的size。就是配置中的HardMaxCacheSize/bigcache中shard的数量
 func (c Config) maximumShardSizeInBytes() int {
 	maxShardSize := 0
 
