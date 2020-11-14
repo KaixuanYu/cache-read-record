@@ -131,7 +131,7 @@ func (c *BigCache) Get(key string) ([]byte, error) {
 // GetWithInfo reads entry for the key with Response info.
 // It returns an ErrEntryNotFound when
 // no entry exists for the given key.
-// Response info 里面只有删除的类型，这是会返回软删除的key吗？
+// Response info 里面只有删除的类型，这是会返回软删除的key吗？是的，getWithInfo会返回已经过期但是未删除的key，并且Response会标记已经删除
 func (c *BigCache) GetWithInfo(key string) ([]byte, Response, error) {
 	hashedKey := c.hash.Sum64(key)
 	shard := c.getShard(hashedKey)
@@ -230,6 +230,7 @@ func (c *BigCache) onEvict(oldestEntry []byte, currentTimestamp uint64, evict fu
 	return false
 }
 
+//cleanUp清除所有的过期key value
 func (c *BigCache) cleanUp(currentTimestamp uint64) {
 	for _, shard := range c.shards {
 		shard.cleanUp(currentTimestamp)
