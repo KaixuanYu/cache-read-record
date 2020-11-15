@@ -284,7 +284,7 @@ func (q *BytesQueue) canInsertAfterTail(need int) bool {
 	// at least headerEntrySize bytes so we can put an empty entry
 	// 2.头和尾之间仍然有未使用的空间，那么我们必须至少保留headerEntrySize字节，以便我们可以放置一个空条目
 	// 现在是队列头（0）-> tail(3) -> head(104) -> capacity(512)，tail-head是空区域，就判断104-3是不是大于我想要的空间
-	// todo 为啥要留一个空条目呢？
+	// todo 为啥要留一个空条目呢？这个空条目就是用来在执行 allocateAdditionalMemory 填充的。
 	return q.head-q.tail == need || q.head-q.tail >= need+minimumHeaderSize
 }
 
