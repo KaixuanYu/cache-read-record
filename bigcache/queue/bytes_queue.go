@@ -139,6 +139,9 @@ func (q *BytesQueue) allocateAdditionalMemory(minimum int) {
 				//todo 这里push的count++后是不是就多加了1了？而且临界值好像不准啊。
 				//如果长度正好是128，那么在这么计算之后，填充的是127？
 				// 我认为这是一个bug，并给作者提了issue ： https://github.com/allegro/bigcache/issues/253
+				// 在v2.2.1 - v3.0.0 (我阅读代码时候的版本) 都有这个bug。而且我认为修复起来很麻烦。
+				// 如果没有后续版本，最好用 v2.2.0 以及之前版本
+
 				// 为啥要push一个空byte到free space，因为head和tail要被重置。head会被重置到最前面
 				// 如果我们之后有pop操作，会从head pop一个元素，这个一个元素就是varintSize+bug，空的那一块没有varint，所以解析不出来
 				// 然后这里push操作就是将这块空space，varint一下，符合编码~
