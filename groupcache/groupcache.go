@@ -109,6 +109,7 @@ func newGroup(name string, cacheBytes int64, getter Getter, peers PeerPicker) *G
 		cacheBytes: cacheBytes,
 		loadGroup:  &singleflight.Group{},
 	}
+	//newGroupHook 是通过一个函数注册的，需要调用放提前注册，然后在每次创建一个新的group的时候，就会调用。
 	if fn := newGroupHook; fn != nil {
 		fn(g)
 	}
@@ -217,6 +218,7 @@ func (g *Group) initPeers() {
 	}
 }
 
+//首先从cache中找（cache中有就直接返回），如果cache中没有
 func (g *Group) Get(ctx context.Context, key string, dest Sink) error {
 	g.peersOnce.Do(g.initPeers)
 	g.Stats.Gets.Add(1)

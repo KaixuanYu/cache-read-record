@@ -87,6 +87,10 @@ type HTTPPoolOptions struct {
 // For convenience, it also registers itself as an http.Handler with http.DefaultServeMux.
 // The self argument should be a valid base URL that points to the current server,
 // for example "http://example.net:8000".
+// NewHTTPPool初始化对等体的HTTP池，并将其自身注册为PeerPicker。
+//为方便起见，它还将自己注册为带有http.DefaultServeMux的http.Handler。
+// self参数应该是指向当前服务器的有效基本URL，
+//例如“ http://example.net:8000”。
 func NewHTTPPool(self string) *HTTPPool {
 	p := NewHTTPPoolOpts(self, nil)
 	http.Handle(p.opts.BasePath, p)
@@ -209,7 +213,7 @@ var bufferPool = sync.Pool{
 
 //就封装了个http调用
 func (h *httpGetter) Get(ctx context.Context, in *pb.GetRequest, out *pb.GetResponse) error {
-	u := fmt.Sprintf(
+	u := fmt.Sprintf( //大约就是http://127.0.0.1:49293/_groupcache/httpPoolTest/0。每个节点在NewHTTPPool的时候都会启动一个http监听
 		"%v%v/%v",
 		h.baseURL,
 		url.QueryEscape(in.GetGroup()),
